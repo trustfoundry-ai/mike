@@ -1033,6 +1033,7 @@ tabularRouter.post("/:reviewId/generate", requireAuth, async (req, res) => {
                             );
                         },
                         api_keys,
+                        stream.signal,
                     );
                 } catch (err) {
                     console.error(
@@ -1754,6 +1755,7 @@ async function queryTabularAllColumns(
     columns: Column[],
     onResult: (columnIndex: number, result: CellResult) => Promise<void>,
     apiKeys?: import("../lib/llm").UserApiKeys,
+    abortSignal?: AbortSignal,
 ): Promise<void> {
     const columnsDesc = columns
         .map((col) => {
@@ -1816,6 +1818,12 @@ Rules:
             messages: [{ role: "user", content: USER }],
             tools: [],
             apiKeys,
+            // F6: propagate the SSE stream's abort signal so that when the
+            // client closes the tab (req "close" → stream aborts) the in-flight
+            // provider request is torn down instead of running to completion.
+            // Without this, every per-document call in the caller's Promise.all
+            // keeps burning tokens after the user has already navigated away.
+            abortSignal,
             callbacks: {
                 onContentDelta: (delta) => {
                     contentBuffer += delta;
